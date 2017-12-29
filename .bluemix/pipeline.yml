@@ -33,10 +33,10 @@ stages:
     value: undefined
     type: text
   - name: CF_BLUEMIX_ROUTE_NAME
-    value: change_my_route_name
+    value: change-my-route-name
     type: text
   - name: CF_MIISKIN_COM_ROUTE_NAME
-    value: change_my_route_name
+    value: change-my-route-name
     type: text
   - name: OLD_CF_APP
     value: undefined
@@ -79,51 +79,85 @@ stages:
     script: |
       #!/bin/bash
       CF_APP_TMP=$CF_APP-TMP
-      # Push app
-      ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
-      if ! cf app $CF_APP; then
-        echo 'No APP: '$CF_APP' founded'
-        echo '1st release: '$CF_APP
-        cf rename $CF_APP_TMP $CF_APP
-        cf push $CF_APP -i 3 -m 1024M -t 180 --no-hostname --no-route -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
-        cf map-route $CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
-        cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
-      else
-      OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
 
-        rollback() {
-          set +e
-          if cf app $OLD_CF_APP; then
-            echo 'Start rollback'
-            cf logs $CF_APP --recent
-            cf delete $CF_APP -f
-            cf rename $OLD_CF_APP $CF_APP
-            cf delete $CF_APP_TMP -f
+      function push()
+      {
+        # Push app
+        ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
+        echo 'Pushing articfact '$ARTIFACT' to app '$CF_APP_TMP
+        cf push $CF_APP_TMP -i 3 -m 1024M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+      }
+
+      function verify()
+      {
+          local ping_result=''
+          # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+          echo 'Ping to the server'
+          # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+          APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
+          echo 'Ping '$APP_TMP_URL
+          ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
+          echo 'Ping result was: '$ping_result
+
+          # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
+          OK_CODE=200
+          if [ -z "$1" ] && [$ping_result -ne $OK_CODE]; then
+          	exit 1
           fi
-          exit 1
-        }
-        set -e
-        trap rollback ERR
-        cf rename $CF_APP $OLD_CF_APP
-        cf push $CF_APP -i 3 -m 1024M -t 180 --no-hostname --no-route -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
-        # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
-        echo 'Ping to the server'
-        # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
-        APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
-        echo 'Ping '$APP_TMP_URL
-        PING_CODE=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
+
+          echo "$ping_result"
+      }
+
+      function rollback() {
+        set +e
+        if cf app $OLD_CF_APP; then
+          echo 'Start rollback'
+          cf logs $CF_APP_TMP --recent
+          cf delete $CF_APP_TMP -f
+          cf rename $OLD_CF_APP $CF_APP
+          cf delete $CF_APP_TMP -f
+        fi
+        exit 1
+      }
+
+      function verifyAndRollbackIfError() {
+        PING_CODE=$(verify)
         OK_CODE=200
         if [ $PING_CODE = $OK_CODE ] ; then
             echo 'Successful ping'
-          else
-              echo 'Fail ping to APP URL ' $APP_TMP_URL
-      	rollback
+        else
+            echo 'Fail ping to APP'
+      	    rollback
         fi
+      }
+
+      function renameTmpAppToRealAppAndMapRoutes() {
         echo 'Rename APP TMP to APP and unmap TMP route'
         cf rename $CF_APP_TMP $CF_APP
         echo 'Map routes to APP'
         cf map-route $CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
         cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
+        cf unmap-route $CF_APP eu-gb.mybluemix.net -n $CF_APP_TMP
+      }
+
+      if ! cf app $CF_APP; then
+        echo 'App: '$CF_APP' not found. Releasing for the first time.'
+
+        push
+        verify exitIfNotSuccessful
+        renameTmpAppToRealAppAndMapRoutes
+
+      else
+        OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
+
+        set -e
+        trap rollback ERR
+        cf rename $CF_APP $OLD_CF_APP
+
+        push
+        verifyAndRollbackIfError
+        renameTmpAppToRealAppAndMapRoutes
+
         echo 'Unmap routes to OLD APP'
         cf unmap-route $OLD_CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
         cf unmap-route $OLD_CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME

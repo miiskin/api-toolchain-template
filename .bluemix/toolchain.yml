@@ -25,7 +25,7 @@ services:
   sample-repo:
     service_id: githubpublic
     parameters:
-      repo_name: 'Miiskin server'
+      repo_name: 'miiskin-server'
       repo_url: 'https://github.com/miiskin/miiskin-server'
       type: existing
       has_issues: true
