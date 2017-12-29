@@ -10,6 +10,14 @@ stages:
   jobs:
   - name: Build
     type: builder
+    build_type: gradle
+    artifact_dir: 'module-init/build/libs'
+    script: |
+      #!/bin/bash
+      export JAVA_HOME=/opt/IBM/java8
+      ./gradlew -v
+      ./gradlew clean
+      ./gradlew assemble -p module-init/
 - name: DEPLOY
   inputs:
   - type: job
@@ -24,7 +32,32 @@ stages:
   - name: APP_URL
     value: undefined
     type: text
+  - name: OLD_CF_APP
+    value: undefined
+    type: text
+  - name: CF_APP_TMP
+    value: undefined
+    type: text
   jobs:
+  - name: Setup environment properties
+    type: deployer
+    script: |
+      #!/bin/bash
+      CF_APP_TMP=$CF_APP-TMP
+      export CF_APP_TMP="$CF_APP_TMP"
+
+      enviroment() {
+
+      exit 0
+      }
+
+      if cf app $CF_APP_TMP; then
+        enviroment
+      else
+        set -e
+        trap enviroment ERR
+        cf push $CF_APP_TMP
+      fi
   - name: Blue-Green Deploy
     type: deployer
     target:
@@ -34,29 +67,71 @@ stages:
       application: ${CF_APP_NAME}
     script: |
       #!/bin/bash
+      CF_APP_TMP=$CF_APP-TMP
       # Push app
-      if ! cf app $CF_APP; then  
-        cf push $CF_APP
+      ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
+      if ! cf app $CF_APP; then
+        echo 'No APP: '$CF_APP' founded'
+        echo '1st release: '$CF_APP
+        cf rename $CF_APP_TMP $CF_APP
+        cf push $CF_APP -t 180 -i 1 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+        cf map-route $CF_APP miiskin.com -n $CF_APP
+        cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_APP
+        cf unmap-route $CF_APP eu-gb.mybluemix.net -n $CF_APP_TMP
       else
-        OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
+      OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
+
         rollback() {
-          set +e  
+          set +e
           if cf app $OLD_CF_APP; then
+            echo 'Start rollback'
             cf logs $CF_APP --recent
             cf delete $CF_APP -f
             cf rename $OLD_CF_APP $CF_APP
+            cf delete $CF_APP_TMP -f
           fi
           exit 1
         }
         set -e
         trap rollback ERR
         cf rename $CF_APP $OLD_CF_APP
-        cf push $CF_APP
-        cf delete $OLD_CF_APP -f
+        cf push $CF_APP_TMP -t 180 -i 1 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+        # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+        echo 'Ping to the server'
+        # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+        APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
+        echo 'Ping '$APP_TMP_URL
+        PING_CODE=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
+        OK_CODE=200
+        if [ $PING_CODE = $OK_CODE ] ; then
+            echo 'Successful ping'
+          else
+              echo 'Fail ping to APP URL ' $APP_TMP_URL
+      	rollback
+        fi
+        echo 'Rename APP TMP to APP and unmap TMP route'
+        cf rename $CF_APP_TMP $CF_APP
+        cf unmap-route $CF_APP eu-gb.mybluemix.net -n $CF_APP_TMP
+        echo 'Map routes to APP'
+        cf map-route $CF_APP miiskin.com -n $CF_APP
+        cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_APP
+        echo 'Unmap routes to OLD APP'
+        cf unmap-route $OLD_CF_APP miiskin.com -n $CF_APP
+        cf unmap-route $OLD_CF_APP eu-gb.mybluemix.net -n $CF_APP
       fi
       # Export app name and URL for use in later Pipeline jobs
       export CF_APP_NAME="$CF_APP"
-      export APP_URL=http://$(cf app $CF_APP_NAME | grep -e urls: -e routes: | awk '{print $2}')
+      export APP_URL=http://$(cf app $CF_APP_NAME | grep urls: | awk '{print $2}')
+      export OLD_CF_APP="$OLD_CF_APP"
       # View logs
       #cf logs "${CF_APP}" --recent
-      
+  - name: Stop old app (delayed)
+    type: deployer
+    script: |
+      #!/bin/bash
+      if cf app $OLD_CF_APP; then
+        echo 'waiting 60 seconds'
+        sleep 60
+         # stop $OLD_CF_APP after x minutes, to finish old request on these instances
+          cf stop $OLD_CF_APP
+      fi

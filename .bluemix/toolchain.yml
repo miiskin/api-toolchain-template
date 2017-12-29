@@ -13,11 +13,11 @@ template:
     - sample-repo
   info:
     git url: >-
-      [https://github.com/open-toolchain/simple-toolchain](https://github.com/open-toolchain/simple-toolchain)
+      [https://github.com/miiskin/api-toolchain-template](https://github.com/miiskin/api-toolchain-template)
     git branch: >-
-      [master](https://github.com/open-toolchain/simple-toolchain/tree/master)
+      [master](https://github.com/miiskin/api-toolchain-template/tree/master)
 toolchain:
-  name: 'simple-toolchain-{{timestamp}}'
+  name: 'api-toolchain-{{timestamp}}'
   template:
     getting_started:
       $ref: "#/messages/template.gettingStarted"
@@ -25,11 +25,11 @@ services:
   sample-repo:
     service_id: githubpublic
     parameters:
-      repo_name: '{{toolchain.name}}'
-      repo_url: 'https://github.com/open-toolchain/node-hello-world'
-      type: clone
+      repo_name: 'Miiskin server'
+      repo_url: 'https://github.com/miiskin/miiskin-server'
+      type: existing
       has_issues: true
-      enable_traceability: true
+      enable_traceability: false
   sample-build:
     service_id: pipeline
     parameters:
@@ -47,8 +47,6 @@ services:
           PROD_ORG_NAME: '{{form.pipeline.parameters.prod-organization}}'
           PROD_REGION_ID: '{{form.pipeline.parameters.prod-region}}'
         execute: true
-  webide:
-    service_id: orion
 form:
   pipeline:
     parameters:
