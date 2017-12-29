@@ -41,6 +41,11 @@ stages:
   jobs:
   - name: Setup environment properties
     type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      organization: ${PROD_ORG_NAME}
+      space: ${PROD_SPACE_NAME}
+      application: ${CF_APP_NAME}
     script: |
       #!/bin/bash
       CF_APP_TMP=$CF_APP-TMP
@@ -127,6 +132,11 @@ stages:
       #cf logs "${CF_APP}" --recent
   - name: Stop old app (delayed)
     type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      organization: ${PROD_ORG_NAME}
+      space: ${PROD_SPACE_NAME}
+      application: ${CF_APP_NAME}
     script: |
       #!/bin/bash
       if cf app $OLD_CF_APP; then
