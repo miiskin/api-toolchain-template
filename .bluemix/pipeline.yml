@@ -101,13 +101,14 @@ stages:
           ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL)
           echo 'Ping result was: '$ping_result
 
-          # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
-          if [ ! -z "$1" ] && [ "$ping_result" != "200" ] ; then
+          # If called with a second argument, we exit now, since we are doing a first time release and there is no rollback option
+          if [ ! -z "$2" ] && [ "$ping_result" != "200" ] ; then
             echo 'Exiting deployment, since ping was not successful'
           	exit 1
           fi
 
-          echo "$ping_result"
+          local  __resultvar=$1
+          eval $__resultvar="'$ping_result'"
       }
 
       function rollback() {
@@ -123,7 +124,7 @@ stages:
       }
 
       function verifyAndRollbackIfError() {
-        PING_CODE=$(verify)
+        verify PING_CODE
         echo 'Ping code: '$PING_CODE
         if [ "$PING_CODE" = "200" ] ; then
             echo 'Successful ping'
@@ -146,7 +147,7 @@ stages:
         echo 'App: '$CF_APP' not found. Releasing for the first time.'
 
         push
-        verify exitIfNotSuccessful
+        verify PING_CODE exitIfNotSuccessful
         renameTmpAppToRealAppAndMapRoutes
 
       else
