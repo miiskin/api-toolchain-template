@@ -31,10 +31,10 @@ stages:
     value: undefined
     type: text
   - name: CF_BLUEMIX_ROUTE_NAME
-    value: change-my-route-name
+    value: ${PROD_HOSTNAME_BLUEMIX}
     type: text
   - name: CF_MIISKIN_COM_ROUTE_NAME
-    value: change-my-route-name
+    value: ${PROD_HOSTNAME_MIISKIN}
     type: text
   - name: OLD_CF_APP
     value: undefined

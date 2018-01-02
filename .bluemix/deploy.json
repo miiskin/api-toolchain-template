@@ -32,13 +32,23 @@
             },
             "type": "string",
             "pattern": "\\S"
+        },
+        "prod-hostname-bluemix": {
+            "description": "The bluemix hostname e.g. api-dev, which will give api-dev.eu-gb.mybluemix.net",
+            "type": "string"
+        },
+        "prod-hostname-miiskin": {
+            "description": "The miiskin hostname e.g. api-dev, which will give api-dev.miiskin.com",
+            "type": "string"
         }
     },
     "required": [
         "prod-region",
         "prod-organization",
         "prod-space",
-        "prod-app-name"
+        "prod-app-name",
+        "prod-hostname-bluemix",
+        "prod-hostname-miiskin"
     ],
     "form": [
         {
@@ -105,6 +115,16 @@
                     "readonly": false
                 }
             ]
+        },
+        {
+            "type": "text",
+            "readonly": false,
+            "key": "prod-hostname-bluemix"
+        },
+        {
+            "type": "text",
+            "readonly": false,
+            "key": "prod-hostname-miiskin"
         }
     ]
 }
