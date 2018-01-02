@@ -66,7 +66,7 @@ stages:
       if cf app $CF_APP_TMP; then
         enviroment
       else
-        set -e
+        set -E
         trap enviroment ERR
         cf push $CF_APP_TMP --no-hostname --no-route
       fi
@@ -92,6 +92,7 @@ stages:
 
       function verify()
       {
+          echo 'Verifying...'
           local ping_result=''
           # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
           echo 'Ping to the server'
@@ -123,6 +124,7 @@ stages:
 
       function verifyAndRollbackIfError() {
         PING_CODE=$(verify)
+        echo 'Ping code: '$PING_CODE
         if [ "$PING_CODE" == "200" ] ; then
             echo 'Successful ping'
         else
@@ -148,6 +150,7 @@ stages:
         renameTmpAppToRealAppAndMapRoutes
 
       else
+        echo 'App: '$CF_APP' already exists. Deploying for the x-th time.'
         OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
 
         set -e
