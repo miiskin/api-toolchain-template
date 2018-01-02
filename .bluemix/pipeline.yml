@@ -101,8 +101,8 @@ stages:
           echo 'Ping result was: '$ping_result
 
           # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
-          OK_CODE=200
-          if [ -z "$1" ] && ["$ping_result" != "$OK_CODE"]; then
+          if [ ! -z "$1" ] && [ "$ping_result" != "200" ] ; then
+            echo 'Exiting deployment, since ping was not successful'
           	exit 1
           fi
 
@@ -123,8 +123,7 @@ stages:
 
       function verifyAndRollbackIfError() {
         PING_CODE=$(verify)
-        OK_CODE=200
-        if [ "$PING_CODE" == "$OK_CODE" ] ; then
+        if [ "$PING_CODE" == "200" ] ; then
             echo 'Successful ping'
         else
             echo 'Fail ping to APP'
