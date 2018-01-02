@@ -1,183 +1,183 @@
-  ---
-  stages:
-  - name: BUILD
-    inputs:
-    - type: git
-      branch: master
-      service: ${SAMPLE_REPO}
-    jobs:
-    - name: Build
-      type: builder
-      build_type: gradle
-      artifact_dir: 'module-init/build/libs'
-      script: |
-        #!/bin/bash
-        export JAVA_HOME=/opt/IBM/java8
-        ./gradlew -v
-        ./gradlew clean
-        ./gradlew assemble -p module-init/
-  - name: DEPLOY
-    inputs:
-    - type: job
-      stage: BUILD
-      job: Build
-    triggers:
-    - type: stage
-    properties:
-    - name: CF_APP_NAME
-      value: undefined
-      type: text
-    - name: APP_URL
-      value: undefined
-      type: text
-    - name: CF_BLUEMIX_ROUTE_NAME
-      value: change-my-route-name
-      type: text
-    - name: CF_MIISKIN_COM_ROUTE_NAME
-      value: change-my-route-name
-      type: text
-    - name: OLD_CF_APP
-      value: undefined
-      type: text
-    - name: CF_APP_TMP
-      value: undefined
-      type: text
-    jobs:
-    - name: Setup environment properties
-      type: deployer
-      target:
-        region_id: ${PROD_REGION_ID}
-        organization: ${PROD_ORG_NAME}
-        space: ${PROD_SPACE_NAME}
-        application: ${CF_APP_NAME}
-      script: |
-        #!/bin/bash
-        CF_APP_TMP=$CF_APP-TMP
-        export CF_APP_TMP="$CF_APP_TMP"
+---
+stages:
+- name: BUILD
+  inputs:
+  - type: git
+    branch: master
+    service: ${SAMPLE_REPO}
+  jobs:
+  - name: Build
+    type: builder
+    build_type: gradle
+    artifact_dir: 'module-init/build/libs'
+    script: |
+      #!/bin/bash
+      export JAVA_HOME=/opt/IBM/java8
+      ./gradlew -v
+      ./gradlew clean
+      ./gradlew assemble -p module-init/
+- name: DEPLOY
+  inputs:
+  - type: job
+    stage: BUILD
+    job: Build
+  triggers:
+  - type: stage
+  properties:
+  - name: CF_APP_NAME
+    value: undefined
+    type: text
+  - name: APP_URL
+    value: undefined
+    type: text
+  - name: CF_BLUEMIX_ROUTE_NAME
+    value: change-my-route-name
+    type: text
+  - name: CF_MIISKIN_COM_ROUTE_NAME
+    value: change-my-route-name
+    type: text
+  - name: OLD_CF_APP
+    value: undefined
+    type: text
+  - name: CF_APP_TMP
+    value: undefined
+    type: text
+  jobs:
+  - name: Setup environment properties
+    type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      organization: ${PROD_ORG_NAME}
+      space: ${PROD_SPACE_NAME}
+      application: ${CF_APP_NAME}
+    script: |
+      #!/bin/bash
+      CF_APP_TMP=$CF_APP-TMP
+      export CF_APP_TMP="$CF_APP_TMP"
 
-        enviroment() {
+      enviroment() {
 
-        exit 0
-        }
+      exit 0
+      }
 
-        if cf app $CF_APP_TMP; then
-          enviroment
-        else
-          set -e
-          trap enviroment ERR
-          cf push $CF_APP_TMP --no-hostname --no-route
-        fi
-    - name: Blue-Green Deploy
-      type: deployer
-      target:
-        region_id: ${PROD_REGION_ID}
-        organization: ${PROD_ORG_NAME}
-        space: ${PROD_SPACE_NAME}
-        application: ${CF_APP_NAME}
-      script: |
-        #!/bin/bash
-        CF_APP_TMP=$CF_APP-TMP
+      if cf app $CF_APP_TMP; then
+        enviroment
+      else
+        set -e
+        trap enviroment ERR
+        cf push $CF_APP_TMP --no-hostname --no-route
+      fi
+  - name: Blue-Green Deploy
+    type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      organization: ${PROD_ORG_NAME}
+      space: ${PROD_SPACE_NAME}
+      application: ${CF_APP_NAME}
+    script: |
+      #!/bin/bash
+      CF_APP_TMP=$CF_APP-TMP
 
-        function push()
-        {
-          # Push app
-          ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
-          echo 'Pushing articfact '$ARTIFACT' to app '$CF_APP_TMP
-          cf push $CF_APP_TMP -i 3 -m 1024M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
-        }
+      function push()
+      {
+        # Push app
+        ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
+        echo 'Pushing articfact '$ARTIFACT' to app '$CF_APP_TMP
+        cf push $CF_APP_TMP -i 3 -m 1024M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+      }
 
-        function verify()
-        {
-            local ping_result=''
-            # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
-            echo 'Ping to the server'
-            # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
-            APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
-            echo 'Ping '$APP_TMP_URL
-            ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
-            echo 'Ping result was: '$ping_result
+      function verify()
+      {
+          local ping_result=''
+          # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+          echo 'Ping to the server'
+          # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
+          APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
+          echo 'Ping '$APP_TMP_URL
+          ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
+          echo 'Ping result was: '$ping_result
 
-            # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
-            OK_CODE=200
-            if [ -z "$1" ] && [$ping_result -ne $OK_CODE]; then
-            	exit 1
-            fi
-
-            echo "$ping_result"
-        }
-
-        function rollback() {
-          set +e
-          if cf app $OLD_CF_APP; then
-            echo 'Start rollback'
-            cf logs $CF_APP_TMP --recent
-            cf delete $CF_APP_TMP -f
-            cf rename $OLD_CF_APP $CF_APP
-            cf delete $CF_APP_TMP -f
-          fi
-          exit 1
-        }
-
-        function verifyAndRollbackIfError() {
-          PING_CODE=$(verify)
+          # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
           OK_CODE=200
-          if [ $PING_CODE = $OK_CODE ] ; then
-              echo 'Successful ping'
-          else
-              echo 'Fail ping to APP'
-              rollback
+          if [ -z "$1" ] && [$ping_result -ne $OK_CODE]; then
+          	exit 1
           fi
-        }
 
-        function renameTmpAppToRealAppAndMapRoutes() {
-          echo 'Rename APP TMP to APP and unmap TMP route'
-          cf rename $CF_APP_TMP $CF_APP
-          echo 'Map routes to APP'
-          cf map-route $CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
-          cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
-          cf unmap-route $CF_APP eu-gb.mybluemix.net -n $CF_APP_TMP
-        }
+          echo "$ping_result"
+      }
 
-        if ! cf app $CF_APP; then
-          echo 'App: '$CF_APP' not found. Releasing for the first time.'
-
-          push
-          verify exitIfNotSuccessful
-          renameTmpAppToRealAppAndMapRoutes
-
-        else
-          OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
-
-          set -e
-          trap rollback ERR
-          cf rename $CF_APP $OLD_CF_APP
-
-          push
-          verifyAndRollbackIfError
-          renameTmpAppToRealAppAndMapRoutes
-
-          echo 'Unmap routes to OLD APP'
-          cf unmap-route $OLD_CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
-          cf unmap-route $OLD_CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
-        fi
-        # Export app name and URL for use in later Pipeline jobs
-        export CF_APP_NAME="$CF_APP"
-        export APP_URL=http://$(cf app $CF_APP_NAME | grep routes: | awk '{print $2}')
-        export OLD_CF_APP="$OLD_CF_APP"
-        # View logs
-        #cf logs "${CF_APP}" --recent
-    - name: Stop old app (delayed)
-      type: deployer
-      target:
-        region_id: ${PROD_REGION_ID}
-        organization: ${PROD_ORG_NAME}
-        space: ${PROD_SPACE_NAME}
-        application: ${CF_APP_NAME}
-      script: |
-        #!/bin/bash
+      function rollback() {
+        set +e
         if cf app $OLD_CF_APP; then
-          echo 'waiting 60 seconds'
-          sleep 60
-           # stop $OLD_CF_APP after x minutes, to finish old request on these instances
-            cf stop $OLD_CF_APP
+          echo 'Start rollback'
+          cf logs $CF_APP_TMP --recent
+          cf delete $CF_APP_TMP -f
+          cf rename $OLD_CF_APP $CF_APP
+          cf delete $CF_APP_TMP -f
         fi
+        exit 1
+      }
+
+      function verifyAndRollbackIfError() {
+        PING_CODE=$(verify)
+        OK_CODE=200
+        if [ $PING_CODE = $OK_CODE ] ; then
+            echo 'Successful ping'
+        else
+            echo 'Fail ping to APP'
+      	    rollback
+        fi
+      }
+
+      function renameTmpAppToRealAppAndMapRoutes() {
+        echo 'Rename APP TMP to APP and unmap TMP route'
+        cf rename $CF_APP_TMP $CF_APP
+        echo 'Map routes to APP'
+        cf map-route $CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
+        cf map-route $CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
+        cf unmap-route $CF_APP eu-gb.mybluemix.net -n $CF_APP_TMP
+      }
+
+      if ! cf app $CF_APP; then
+        echo 'App: '$CF_APP' not found. Releasing for the first time.'
+
+        push
+        verify exitIfNotSuccessful
+        renameTmpAppToRealAppAndMapRoutes
+
+      else
+        OLD_CF_APP=${CF_APP}-OLD-$(date +"%s")
+
+        set -e
+        trap rollback ERR
+        cf rename $CF_APP $OLD_CF_APP
+
+        push
+        verifyAndRollbackIfError
+        renameTmpAppToRealAppAndMapRoutes
+
+        echo 'Unmap routes to OLD APP'
+        cf unmap-route $OLD_CF_APP miiskin.com -n $CF_MIISKIN_COM_ROUTE_NAME
+        cf unmap-route $OLD_CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
+      fi
+      # Export app name and URL for use in later Pipeline jobs
+      export CF_APP_NAME="$CF_APP"
+      export APP_URL=http://$(cf app $CF_APP_NAME | grep routes: | awk '{print $2}')
+      export OLD_CF_APP="$OLD_CF_APP"
+      # View logs
+      #cf logs "${CF_APP}" --recent
+  - name: Stop old app (delayed)
+    type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      organization: ${PROD_ORG_NAME}
+      space: ${PROD_SPACE_NAME}
+      application: ${CF_APP_NAME}
+    script: |
+      #!/bin/bash
+      if cf app $OLD_CF_APP; then
+        echo 'waiting 60 seconds'
+        sleep 60
+         # stop $OLD_CF_APP after x minutes, to finish old request on these instances
+          cf stop $OLD_CF_APP
+      fi
