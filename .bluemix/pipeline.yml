@@ -96,9 +96,9 @@ stages:
           local ping_result=''
           # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
           echo 'Ping to the server'
-          APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
+          APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')/api/public/ping
           echo 'Ping '$APP_TMP_URL
-          ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
+          ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL)
           echo 'Ping result was: '$ping_result
 
           # If called with an argument, we exit now, since we are doing a first time release and there is no rollback option
@@ -125,7 +125,7 @@ stages:
       function verifyAndRollbackIfError() {
         PING_CODE=$(verify)
         echo 'Ping code: '$PING_CODE
-        if [ "$PING_CODE" == "200" ] ; then
+        if [ "$PING_CODE" = "200" ] ; then
             echo 'Successful ping'
         else
             echo 'Fail ping to APP'
@@ -166,11 +166,9 @@ stages:
         cf unmap-route $OLD_CF_APP eu-gb.mybluemix.net -n $CF_BLUEMIX_ROUTE_NAME
       fi
       # Export app name and URL for use in later Pipeline jobs
+      export OLD_CF_APP="$OLD_CF_APP"
       export CF_APP_NAME="$CF_APP"
       export APP_URL=http://$(cf app $CF_APP_NAME | grep routes: | awk '{print $2}')
-      export OLD_CF_APP="$OLD_CF_APP"
-      # View logs
-      #cf logs "${CF_APP}" --recent
   - name: Stop old app (delayed)
     type: deployer
     target:
