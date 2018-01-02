@@ -40,6 +40,10 @@
         "prod-hostname-miiskin": {
             "description": "The miiskin hostname e.g. api-dev, which will give api-dev.miiskin.com",
             "type": "string"
+        },
+        "prod-instance-count": {
+            "description": "The number of instances that will initially be started when doing a new deploy",
+            "type": "string"
         }
     },
     "required": [
@@ -48,7 +52,8 @@
         "prod-space",
         "prod-app-name",
         "prod-hostname-bluemix",
-        "prod-hostname-miiskin"
+        "prod-hostname-miiskin",
+        "prod-instance-count"
     ],
     "form": [
         {
@@ -125,6 +130,11 @@
             "type": "text",
             "readonly": false,
             "key": "prod-hostname-miiskin"
+        },
+        {
+            "type": "text",
+            "readonly": false,
+            "key": "prod-instance-count"
         }
     ]
 }

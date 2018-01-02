@@ -47,7 +47,9 @@ services:
           PROD_ORG_NAME: '{{form.pipeline.parameters.prod-organization}}'
           PROD_REGION_ID: '{{form.pipeline.parameters.prod-region}}'
           PROD_HOSTNAME_BLUEMIX: '{{form.pipeline.parameters.prod-hostname-bluemix}}'
-          PROD_HOSTNAME_MIISKIN: '{{form.pipeline.parameters.prod-hostname-bluemix}}'
+          PROD_HOSTNAME_MIISKIN: '{{form.pipeline.parameters.prod-hostname-miiskin}}'
+          PROD_INSTANCE_COUNT: '{{form.pipeline.parameters.prod-instance-count}}'
+
         execute: true
 form:
   pipeline:

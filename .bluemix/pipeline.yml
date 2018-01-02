@@ -42,6 +42,9 @@ stages:
   - name: CF_APP_TMP
     value: undefined
     type: text
+  - name: CF_PROD_INSTANCE_COUNT
+    value: ${PROD_INSTANCE_COUNT}
+    type: text
   jobs:
   - name: Setup environment properties
     type: deployer
@@ -81,9 +84,10 @@ stages:
       function push()
       {
         # Push app
+        echo 'Finding artifact'
         ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
         echo 'Pushing articfact '$ARTIFACT' to app '$CF_APP_TMP
-        cf push $CF_APP_TMP -i 3 -m 1024M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+        cf push $CF_APP_TMP -i $CF_PROD_INSTANCE_COUNT -m 1024M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
       }
 
       function verify()
@@ -91,7 +95,6 @@ stages:
           local ping_result=''
           # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
           echo 'Ping to the server'
-          # Ping CF_APP_TMP to verify that works, exit 1 if the response code is not 200
           APP_TMP_URL=https://$(cf app $CF_APP_TMP | grep routes: | awk '{print $2}')
           echo 'Ping '$APP_TMP_URL
           ping_result=$(curl -s -o /dev/null -w %{http_code} $APP_TMP_URL/api/public/ping)
