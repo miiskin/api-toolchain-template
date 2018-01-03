@@ -1,4 +1,4 @@
-# Develop a Cloud Foundry app with GitHub.com
+# Deploy miiskin server api using a toolchain
 
 This toolchain template is made for building and deploying the miiskin server api to a Bluemix environment.
 
