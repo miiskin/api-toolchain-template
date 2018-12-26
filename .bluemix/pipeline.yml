@@ -12,10 +12,22 @@ stages:
     artifact_dir: 'module-init/build/libs'
     script: |
       #!/bin/bash
-      export JAVA_HOME=/opt/IBM/java8
+      export JAVA_HOME=$JAVA8_HOME
+      export JAVA_TOOL_OPTIONS="-Dhttps.protocols=TLSv1.2"
+      echo $JAVA_HOME
+
+      # Import certificates from third parties that our app is communicating with e.g. mixpanel and chargebee
+      export KEYSTORE_SSL=module-user/src/main/resources/miiskin-qa-truststore.jks
+      export STOREPASS_SSL=n*dRW1D3
+      ./gradlew importSSL
+
       ./gradlew -v
-      ./gradlew clean
-      ./gradlew assemble -p module-init/
+
+      echo Clean the project
+      ./gradlew -Dhttps.protocols=TLSv1.2 clean
+
+      echo Assemble the project
+      ./gradlew -Dhttps.protocols=TLSv1.2 assemble -p module-init/
 - name: DEPLOY
   inputs:
   - type: job
@@ -55,11 +67,12 @@ stages:
       application: ${CF_APP_NAME}
     script: |
       #!/bin/bash
+      CF_APP_TMP=$CF_APP-TMP
       export CF_APP_TMP="$CF_APP_TMP"
 
       enviroment() {
 
-        exit 0
+      exit 0
       }
 
       if cf app $CF_APP_TMP; then
@@ -69,7 +82,6 @@ stages:
         trap enviroment ERR
         cf push $CF_APP_TMP --no-route
       fi
-
   - name: Blue-Green Deploy
     type: deployer
     target:
@@ -87,7 +99,7 @@ stages:
         echo 'Finding artifact'
         ARTIFACT="$(find . -name 'module-init-*.RELEASE.jar')"
         echo 'Pushing articfact '$ARTIFACT' to app '$CF_APP_TMP
-        cf push $CF_APP_TMP -i $CF_PROD_INSTANCE_COUNT -m 2048M -t 180 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
+        cf push $CF_APP_TMP -i $CF_PROD_INSTANCE_COUNT -m 2048M -t 360 -b https://github.com/cloudfoundry/java-buildpack#v3.16 -p $ARTIFACT
       }
 
       function verify()
